@@ -202,6 +202,29 @@ class Qiling(QLCoreStructs, QLCoreHooks, QLCoreUtils):
         if self.debugger is not None:
             self.remotedebugsession.run()
 
+    def run_init(self):
+        # load the loader
+        self.loader.run()
+
+        # setup strace filter for logger
+        # FIXME: only works for logging due to we might need runtime disable nprint
+        if self.strace_filter != None and self.output == QL_OUTPUT.DEFAULT and self.log_file_fd:
+            self.log_file_fd.addFilter(Strace_filter(self.strace_filter))
+
+        # init debugger
+        if self.debugger is not None:
+            ql_debugger_init(self)
+
+        # patch binary
+        self.__enable_bin_patch()
+
+    def run_real(self):
+        # run the binary
+        self.os.run()
+        # resume with debugger
+        if self.debugger is not None:
+            self.remotedebugsession.run()
+
     # patch @code to memory address @addr
     def patch(self, addr, code, file_name=b''):
         if file_name == b'':
