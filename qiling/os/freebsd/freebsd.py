@@ -8,6 +8,7 @@ from qiling.const import *
 from qiling.os.const import *
 from qiling.os.posix.posix import QlOsPosix
 from .const import *
+from ..utils import ql_hook_code_disasm
 
 class QlOsFreebsd(QlOsPosix):
     def __init__(self, ql):

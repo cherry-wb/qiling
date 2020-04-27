@@ -16,6 +16,7 @@ from qiling.os.os import QlOs
 from .dlls import *
 from .const import *
 from .utils import *
+from ..utils import ql_hook_code_disasm
 
 class QlOsWindows(QlOs):
     def __init__(self, ql):

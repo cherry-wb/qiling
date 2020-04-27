@@ -11,7 +11,7 @@ from .const import *
 from .utils import *
 from .futex import *
 from .thread import *
-
+from ..utils import ql_hook_code_disasm
 
 class QlOsLinux(QlOsPosix):
     def __init__(self, ql):

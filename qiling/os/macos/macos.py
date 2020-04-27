@@ -22,6 +22,7 @@ from .subsystems import *
 from .task import *
 from .mach_port import *
 from .const import *
+from ..utils import ql_hook_code_disasm
 
 class QlOsMacos(QlOsPosix):
     def __init__(self, ql):
