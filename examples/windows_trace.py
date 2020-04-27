@@ -5,6 +5,7 @@
 
 import argparse
 import sys
+from capstone import *
 
 sys.path.insert(0, "..")
 
@@ -17,6 +18,7 @@ from pprint import pprint as pp
 from binascii import hexlify, unhexlify
 import re
 import pefile
+import os
 
 
 class colors:
@@ -40,14 +42,14 @@ class colors:
 
 
 def dump_regs(ql, address, size):
-    regs = {'eax': ql.uc.reg_read(UC_X86_REG_EAX),
-            'ebx': ql.uc.reg_read(UC_X86_REG_EBX),
-            'ecx': ql.uc.reg_read(UC_X86_REG_ECX),
-            'edx': ql.uc.reg_read(UC_X86_REG_EDX),
-            'edi': ql.uc.reg_read(UC_X86_REG_EDI),
-            'esi': ql.uc.reg_read(UC_X86_REG_ESI),
-            'ebp': ql.uc.reg_read(UC_X86_REG_EBP),
-            'esp': ql.uc.reg_read(UC_X86_REG_ESP)}
+    regs = {'eax': ql.register(UC_X86_REG_EAX),
+            'ebx': ql.register(UC_X86_REG_EBX),
+            'ecx': ql.register(UC_X86_REG_ECX),
+            'edx': ql.register(UC_X86_REG_EDX),
+            'edi': ql.register(UC_X86_REG_EDI),
+            'esi': ql.register(UC_X86_REG_ESI),
+            'ebp': ql.register(UC_X86_REG_EBP),
+            'esp': ql.register(UC_X86_REG_ESP)}
 
     if not hasattr(dump_regs, 'regs'):
         dump_regs.regs = regs
@@ -70,7 +72,7 @@ def spaced_hex(data):
 
 
 def disasm(count, ql, address, size):
-    buf = ql.mem_read(address, size)
+    buf = ql.mem.read(address, size)
     try:
         for i in md.disasm(buf, address):
             return "{:08X}\t{:08X}: {:24s} {:10s} {:16s}".format(count[0], i.address, spaced_hex(buf), i.mnemonic,
@@ -111,7 +113,9 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--trace", help="Enable full trace", action='store_true', default=False)
     parser.add_argument("-R", "--root", help="rootfs", default=None)
     parser.add_argument("-d", "--dump", help="Directory to dump memory regions to", default="dump")
-    parser.add_argument("-a", "--automatize", help="Automatize writes on standard input", default=False)
+    parser.add_argument("-a", "--automatize_input", help="Automatize writes on standard input", default=False)
+    parser.add_argument("-c ", "--config", help="Path of configuration file",
+                        default="qiling/os/windows/configuration.cfg")
     parser.add_argument('input', nargs='*')
     args = parser.parse_args()
     for path in args.input:

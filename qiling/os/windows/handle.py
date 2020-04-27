@@ -8,16 +8,15 @@
 class Handle:
     ID = 0xa0000000
 
-    def __init__(self, id=None, file=None, regkey=None, thread=None, service=None):
+    def __init__(self, id=None, obj=None,
+                 name=None):
         if id is None:
             self.id = Handle.ID
             Handle.ID += 1
         else:
             self.id = id
-        self.file = file
-        self.regkey = regkey
-        self.thread = thread
-        self.service = service
+        self.obj = obj
+        self.name = name
 
     # rewrite "="
     def __eq__(self, other):
@@ -51,9 +50,15 @@ class HandleManager:
         self.handles[handle.id] = handle
 
     def get(self, id):
-        return self.handles[id]
+        return self.handles.get(id, None)
 
     def delete(self, id):
         key = self.handles.get(id, None)
         if key is not None:
             del self.handles[id]
+
+    def search(self, name):
+        for handle in self.handles.values():
+            if handle.name == name:
+                return handle
+        return None

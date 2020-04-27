@@ -10,7 +10,7 @@ import sys
 from Registry import Registry
 from qiling.os.windows.const import *
 from qiling.exception import *
-
+from qiling.const import *
 
 # Registry Manager reads data from two places
 # 1. config.json
@@ -24,37 +24,40 @@ from qiling.exception import *
 
 
 class RegistryManager:
-    def __init__(self, ql, hive=None, config=None):
+    def __init__(self, ql, hive=None):
         self.ql = ql
-        self.registry_config = None
-        self.config = config
+
+        if self.ql.log_dir is None:
+            self.log_registry_dir = "qlog"
+        else:
+            self.log_registry_dir = self.ql.log_dir
+
+        if self.ql.append:
+            self.registry_diff = self.ql.targetname + "_" + self.ql.append + ".json"
+        else:
+            self.registry_diff = self.ql.targetname + ".json"
+
+        self.regdiff = os.path.join(self.log_registry_dir, "registry", self.registry_diff)    
 
         # hive dir
         if hive:
             self.hive = hive
         else:
             self.hive = os.path.join(ql.rootfs, "Windows", "registry")
-            ql.dprint(0,"[+] Windows Registry PATH: %s" % self.hive)
-            if not os.path.exists(self.hive) and not ql.shellcode:
-                raise QlPrintException("Error: Registry files not found!")
+            ql.dprint(D_INFO, "[+] Windows Registry PATH: %s" % self.hive)
+            if not os.path.exists(self.hive) and not self.ql.shellcoder:
+                raise QlErrorFileNotFound("Error: Registry files not found!")
 
-        if ql.log_dir is None:
-            ql.log_reg_dir = os.path.join(ql.rootfs, "qlog")
-        else:
-            ql.log_reg_dir = ql.log_dir
-
-        self.config = os.path.join(ql.log_reg_dir, "registry", "registry_diff.json")
-
-        if not os.path.exists(self.config):
+        if not os.path.exists(self.regdiff):
             self.registry_config = {}
             try:
-                os.makedirs(os.path.join(ql.log_reg_dir, "registry"), 0o755)
+                os.makedirs(os.path.join(self.log_registry_dir, "registry"), 0o755)
             except Exception:
                 pass
         else:
             # read config
             # use registry config first
-            self.f_config = open(self.config, "rb")
+            self.f_config = open(self.regdiff, "rb")
             data = self.f_config.read()
             if data == b"":
                 self.registry_config = {}
@@ -74,42 +77,44 @@ class RegistryManager:
             self.hklm['SAM'] = Registry.Registry(os.path.join(self.hive, 'SAM'))
             self.hklm['SOFTWARE'] = Registry.Registry(os.path.join(self.hive, 'SOFTWARE'))
             self.hklm['SYSTEM'] = Registry.Registry(os.path.join(self.hive, 'SYSTEM'))
+            self.hklm['HARDWARE'] = Registry.Registry(os.path.join(self.hive, 'HARDWARE'))
             # hkey current user
             self.hkcu = Registry.Registry(os.path.join(self.hive, 'NTUSER.DAT'))
         except FileNotFoundError:
-            if not ql.shellcode:
-                QlPrintException("WARNING: Registry files not found!")
+            if not ql.shellcoder:
+                QlErrorFileNotFound("WARNING: Registry files not found!")
         except Exception:
-            QlPrintException("WARNING: Registry files format error")
+            if not ql.shellcoder:
+                QlErrorFileNotFound("WARNING: Registry files format error")
 
     def exists(self, key):
-        if key in self.config:
+        if key in self.regdiff:
             return True
         keys = key.split("\\")
         try:
             if keys[0] == "HKEY_LOCAL_MACHINE":
                 reg = self.hklm[keys[1]]
-                sub = "\\".join(keys[2:]).replace("\x00", "")
+                sub = "\\".join(keys[2:])
                 data = reg.open(sub)
             elif keys[0] == "HKEY_CURRENT_USER":
                 reg = self.hkcu
-                sub = "\\".join(keys[1:]).replace("\x00", "")
+                sub = "\\".join(keys[1:])
                 data = reg.open(sub)
             else:
                 raise QlErrorNotImplemented("[!] Windows Registry %s not implemented" % (keys[0]))
-        except Exception as e:
+        except Exception:
             return False
 
         return True
 
     def read(self, key, subkey, reg_type):
         # read reg conf first
-        if key in self.config and subkey in self.config[key]:
-            if self.config[key][subkey].type in REG_TYPES:
-                return REG_TYPES[self.config[key][subkey].type], self.config[key][subkey].value
+        if key in self.regdiff and subkey in self.regdiff[key]:
+            if self.regdiff[key][subkey].type in REG_TYPES:
+                return REG_TYPES[self.regdiff[key][subkey].type], self.regdiff[key][subkey].value
             else:
                 raise QlErrorNotImplemented(
-                    "[!] Windows Registry Type %s not implemented" % self.config[key][subkey].type)
+                    "[!] Windows Registry Type %s not implemented" % self.regdiff[key][subkey].type)
 
         # read hive
         reg = None
@@ -118,16 +123,15 @@ class RegistryManager:
         try:
             if keys[0] == "HKEY_LOCAL_MACHINE":
                 reg = self.hklm[keys[1]]
-                sub = "\\".join(keys[2:]).replace("\x00", "")
+                sub = "\\".join(keys[2:])
                 data = reg.open(sub)
             elif keys[0] == "HKEY_CURRENT_USER":
                 reg = self.hkcu
-                sub = "\\".join(keys[1:]).replace("\x00", "")
+                sub = "\\".join(keys[1:])
                 data = reg.open(sub)
             else:
                 raise QlErrorNotImplemented("[!] Windows Registry %s not implemented" % (keys[0]))
 
-            subkey = subkey.replace("\x00", "")
             for value in data.values():
                 if value.name() == subkey and (reg_type == Registry.RegNone or
                                                value.value_type() == reg_type):
@@ -161,22 +165,22 @@ class RegistryManager:
         length = 0
         # string
         if reg_type == Registry.RegSZ or reg_type == Registry.RegExpandSZ:
-            self.ql.mem_write(address, bytes(reg_value, "utf-8") + b"\x00")
+            self.ql.mem.write(address, bytes(reg_value, "utf-16le") + b"\x00")
             length = len(reg_value)
         elif reg_type == Registry.RegBin:
             # you can set REG_BINARY like '\x00\x01\x02' in config.json
             if type(reg_value) == str:
-                self.ql.mem_write(address, bytes(reg_value))
+                self.ql.mem.write(address, bytes(reg_value))
                 length = len(reg_value)
             else:
                 raise QlErrorNotImplemented("[!] Windows Registry Type not implemented")
         elif reg_type == Registry.RegDWord:
             data = self.ql.pack32(reg_value)
-            self.ql.mem_write(address, data)
+            self.ql.mem.write(address, data)
             length = len(data)
         elif reg_type == Registry.RegQWord:
             data = self.ql.pack64(reg_value)
-            self.ql.mem_write(address, data)
+            self.ql.mem.write(address, data)
             length = len(data)
         else:
             raise QlErrorNotImplemented(
@@ -187,5 +191,5 @@ class RegistryManager:
     def save(self):
         # write registry config to config file
         if self.registry_config and len(self.registry_config) != 0:
-            with open(self.config, "wb") as f:
+            with open(self.regdiff, "wb") as f:
                 f.write(bytes(json.dumps(self.registry_config), "utf-8"))
