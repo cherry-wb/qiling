@@ -306,11 +306,13 @@ def ql_hook_code_disasm(ql, address, size):
     for i in tmp:
         ql.nprint(" %02x " % i, end="")
 
+    ql.nprint("\n", end="")
+
     if opsize <= 6:
         ql.nprint("\t", end="")
 
     for i in insn:
-        ql.nprint("%s %s" % (i.mnemonic, i.op_str))
+        ql.nprint("0x%x:\t%s\t%s" %(i.address, i.mnemonic, i.op_str))
 
     if ql.output == QL_OUTPUT.DUMP:
         for reg in ql.reg.table:

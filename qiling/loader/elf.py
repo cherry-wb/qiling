@@ -429,6 +429,8 @@ class QlLoaderELF(ELFParse, QlLoader):
             self.ql.nprint("[+] Some error in head e_type: %u!" %elfhead['e_type'])
             return -1
 
+        # _perms = 7
+        # self.ql.mem.map(loadbase + mem_start, mem_end - mem_start, perms=_perms, info=self.path)
         for i in super().parse_program_header():
             if i['p_type'] == PT_LOAD:
                 _mem_s = ((loadbase + i["p_vaddr"]) // 0x1000 ) * 0x1000
@@ -440,8 +442,8 @@ class QlLoaderELF(ELFParse, QlLoader):
 
                 self.ql.mem.write(loadbase+i["p_vaddr"], super().getelfdata(i['p_offset'], i['p_filesz']))
 
-        if mem_end > _mem_e:
-            self.ql.mem.map(_mem_e, mem_end-_mem_e, info=self.path)
+        if loadbase + mem_end > _mem_e:
+            self.ql.mem.map(_mem_e, loadbase + mem_end -_mem_e, info=self.path)
             self.ql.dprint(D_INFO, "[+] load 0x%x - 0x%x" % (_mem_e, mem_end)) # make sure we map all PT_LOAD tagged area
 
         entry_point = elfhead['e_entry'] + loadbase
