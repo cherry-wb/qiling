@@ -271,8 +271,20 @@ class QLCoreHooks(object):
 
     # a convenient API to set callback for a single address
     def hook_address(self, callback, address, user_data=None):
-        h = HookAddr(callback, address, user_data)
-        self._ql_hook(UC_HOOK_CODE, h)
+        # h = HookAddr(callback, address, user_data)
+        # self._ql_hook(UC_HOOK_CODE, h)
+        def _callback(uc, _addr, _size, pack_data):
+            # unpack what we packed for hook_add()
+            user_data, callback = pack_data
+            if user_data:
+                callback(self, user_data)
+            else:
+                # callback does not require user_data
+                callback(self)
+
+        _callback_wrapper = (catch_KeyboardInterrupt(self))(_callback)
+        # pack user_data & callback for wrapper _callback
+        self.uc.hook_add(UC_HOOK_CODE, _callback_wrapper, (user_data, callback), address, address)
     
     def hook_intno(self, callback, intno, user_data=None):
         h = HookIntr(callback, intno, user_data)
